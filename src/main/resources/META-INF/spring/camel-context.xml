@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="
+         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+         http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd 
+         http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+	
+	<bean id="jmsConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
+		<property name="brokerURL" value="vm://localhost?broker.persistent=false" />
+		<!--<property name="userName" value="${activemq_username}" />
+		<property name="password" value="${activemq_password}" />-->
+	</bean>
+
+	<bean id="pooledConnectionFactory" class="org.apache.activemq.pool.PooledConnectionFactory"
+		init-method="start" destroy-method="stop">
+		<property name="maxConnections" value="8" />
+		<property name="connectionFactory" ref="jmsConnectionFactory" />
+	</bean>
+
+	<bean id="jmsConfig" class="org.apache.camel.component.jms.JmsConfiguration">
+		<property name="connectionFactory" ref="pooledConnectionFactory" />
+		<property name="concurrentConsumers" value="10" />
+	</bean>
+	
+	<bean id="activemq" class="org.apache.activemq.camel.component.ActiveMQComponent">
+		<property name="configuration" ref="jmsConfig" />
+	</bean>
+
+	<!-- we can configure the tracer by defining the tracer bean and set the 
+		properties as we like -->
+	<!-- the id name can be anything its the class that must be org.apache.camel.processor.interceptor.Tracer -->
+	<bean id="camelTracer" class="org.apache.camel.processor.interceptor.Tracer">
+		<property name="traceExceptions" value="false" />
+		<property name="traceInterceptors" value="true" />
+		<property name="logLevel" value="INFO" />
+		<property name="logName" value="com.javacodegeeks.camel" />
+	</bean>
+
+	<camelContext id="camel" trace="true"
+		xmlns="http://camel.apache.org/schema/spring">
+		
+		<package>com.javacodegeeks.camel</package>
+	
+	 	<route>
+		<from uri="timer:foo?period=1s?concurrentConsumers=10" />
+			<transform>
+				<simple>Heartbeat ${date:now:yyyy-MM-dd HH:mm:ss}</simple>
+			</transform>
+			<to uri="bean:myService?method=hello" />
+			<to uri="stream:out" />
+		</route>
+	</camelContext>
+
+</beans>
